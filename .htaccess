@@ -1,4 +1,11 @@
-# Bloqueia acesso à raiz do projeto se alguém tentar acessar fora do public/
-# (cPanel deve estar apontando DocRoot pra public/, mas como segurança extra)
-Order Deny,Allow
-Deny from all
+RewriteEngine On
+
+# Bloqueia acesso direto a paths sensíveis
+RewriteRule ^(\.git|\.env|composer\.|vendor/|src/|config/|database/|cron/|tests/|storage/|logs/|README\.md|\.htaccess$) - [F,L]
+
+# Tudo o resto cai dentro de public/
+RewriteCond %{REQUEST_URI} !^/public/
+RewriteRule ^(.*)$ public/$1 [L]
+
+ServerSignature Off
+Header always unset X-Powered-By
