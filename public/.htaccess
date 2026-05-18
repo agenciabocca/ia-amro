@@ -1,0 +1,15 @@
+RewriteEngine On
+
+# Roteia tudo pra index.php (deixa o PHP decidir o path)
+RewriteCond %{REQUEST_FILENAME} !-f
+RewriteCond %{REQUEST_FILENAME} !-d
+RewriteRule ^ index.php [L]
+
+# Esconde headers do servidor
+Header always unset X-Powered-By
+ServerSignature Off
+
+# CORS aberto só pra endpoints de teste (apertar depois)
+Header set Access-Control-Allow-Origin "*"
+Header set Access-Control-Allow-Headers "Content-Type, X-Test-Secret"
+Header set Access-Control-Allow-Methods "GET, POST, OPTIONS"

@@ -1,0 +1,4 @@
+# Bloqueia acesso à raiz do projeto se alguém tentar acessar fora do public/
+# (cPanel deve estar apontando DocRoot pra public/, mas como segurança extra)
+Order Deny,Allow
+Deny from all

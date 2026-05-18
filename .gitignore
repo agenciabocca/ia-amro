@@ -1,0 +1,17 @@
+.env
+.env.local
+vendor/
+storage/rate_limit/*.json
+storage/tokens/*.json
+storage/produtos_cache.json
+logs/*.log
+*.lock
+!composer.lock
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Mantém pastas vazias no repo
+!storage/.gitkeep
+!logs/.gitkeep
