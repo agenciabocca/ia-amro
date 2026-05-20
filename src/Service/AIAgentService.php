@@ -40,11 +40,18 @@ class AIAgentService
 
             $toolCalls = $msg['tool_calls'] ?? [];
             if ($toolCalls) {
-                foreach ($toolCalls as $i => $tc) {
-                    if (!isset($tc['type'])) {
-                        $msg['tool_calls'][$i]['type'] = 'function';
-                    }
+                $normalized = [];
+                foreach ($toolCalls as $tc) {
+                    $normalized[] = [
+                        'id'       => $tc['id'] ?? '',
+                        'type'     => 'function',
+                        'function' => [
+                            'name'      => $tc['function']['name'] ?? '',
+                            'arguments' => $tc['function']['arguments'] ?? '{}',
+                        ],
+                    ];
                 }
+                $msg['tool_calls'] = $normalized;
             }
             $messages[] = $msg;
 
