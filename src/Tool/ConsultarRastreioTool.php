@@ -33,13 +33,13 @@ class ConsultarRastreioTool implements ToolInterface
     {
         return [
             'name'        => $this->getName(),
-            'description' => 'Consulta status de envio + código de rastreio no Melhor Envio (fonte de verdade). Busca por nome do cliente. Use SEMPRE que cliente perguntar onde está o pedido ou pedir código de rastreio.',
+            'description' => 'Consulta status de envio + código de rastreio no Melhor Envio (fonte de verdade). Busca POR NOME do destinatário. IMPORTANTE: se o cliente só te passou número de pedido, chame consultar_pedido_status PRIMEIRO pra obter o cliente_nome — depois passe esse nome aqui.',
             'parameters'  => [
                 'type'       => 'object',
                 'properties' => [
                     'nome_cliente' => [
                         'type'        => 'string',
-                        'description' => 'Nome do cliente (ex: "Maria Graziela"). Pode ser parcial.',
+                        'description' => 'Nome PESSOAL do cliente (ex: "Maria Graziela"). Pode ser parcial. NUNCA passe número de pedido aqui — esse campo só aceita nome de pessoa.',
                     ],
                     'data_pedido' => [
                         'type'        => 'string',
@@ -63,6 +63,12 @@ class ConsultarRastreioTool implements ToolInterface
 
         if ($nome === '') {
             return ['error' => 'Informe o nome do cliente.'];
+        }
+
+        if (preg_match('/^\d+$/', $nome)) {
+            return [
+                'error' => 'O argumento nome_cliente deve ser nome de pessoa, não número de pedido. Use consultar_pedido_status({numero_pedido}) primeiro pra obter o cliente_nome — depois passe esse nome aqui.',
+            ];
         }
 
         try {
