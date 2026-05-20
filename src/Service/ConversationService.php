@@ -92,25 +92,18 @@ class ConversationService
     private function loadHistory(string $phone): array
     {
         $stmt = $this->db->prepare(
-            'SELECT role, content, tool_calls, tool_call_id FROM chat_memory
-             WHERE session_id = ? ORDER BY id DESC LIMIT ?'
+            'SELECT role, content FROM chat_memory
+             WHERE session_id = ? AND role IN ("user","assistant") AND content <> ""
+             ORDER BY id DESC LIMIT ?'
         );
         $stmt->bindValue(1, $phone);
         $stmt->bindValue(2, self::HISTORY_LIMIT, PDO::PARAM_INT);
         $stmt->execute();
         $rows = array_reverse($stmt->fetchAll());
-        $msgs = [];
-        foreach ($rows as $r) {
-            $m = ['role' => $r['role'], 'content' => $r['content']];
-            if ($r['tool_call_id']) {
-                $m['tool_call_id'] = $r['tool_call_id'];
-            }
-            if ($r['tool_calls']) {
-                $m['tool_calls'] = json_decode($r['tool_calls'], true);
-            }
-            $msgs[] = $m;
-        }
-        return $msgs;
+        return array_map(
+            fn($r) => ['role' => $r['role'], 'content' => $r['content']],
+            $rows
+        );
     }
 
     private function saveMessage(string $phone, string $role, string $content, ?array $toolCalls = null): void
