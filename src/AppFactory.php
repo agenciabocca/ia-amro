@@ -13,6 +13,7 @@ use Amro\Service\AIAgentService;
 use Amro\Service\ConversationService;
 use Amro\Service\PrazoCalculatorService;
 use Amro\Service\ProdutoCatalogService;
+use Amro\Service\RateLimiterService;
 use Amro\Tool\CalcularPrazoEnvioTool;
 use Amro\Tool\ConsultarPedidoStatusTool;
 use Amro\Tool\ConsultarRastreioTool;
@@ -57,6 +58,12 @@ class AppFactory
 
         $promptBuilder = new PromptBuilder($db);
 
-        return new ConversationService($db, $promptBuilder, $agent);
+        $rateLimiter = new RateLimiterService(
+            $db,
+            (int) ($_ENV['RATE_LIMIT_MAX_MESSAGES'] ?? 12),
+            (int) ($_ENV['RATE_LIMIT_WINDOW_SECONDS'] ?? 60)
+        );
+
+        return new ConversationService($db, $promptBuilder, $agent, $rateLimiter);
     }
 }

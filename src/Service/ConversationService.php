@@ -15,29 +15,62 @@ class ConversationService
         private PDO $db,
         private PromptBuilder $promptBuilder,
         private AIAgentService $agent,
+        private ?RateLimiterService $rateLimiter = null,
     ) {}
 
-    public function handleIncoming(string $phone, string $text): array
+    public function handleIncoming(string $phone, string $text, ?string $messageId = null): array
     {
         $phone = preg_replace('/\D/', '', $phone);
+        $text = trim($text);
+
+        if (filter_var($_ENV['AI_DISABLED'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return ['reply' => null, 'paused' => true, 'reason' => 'ai_disabled_kill_switch'];
+        }
+
+        if ($messageId && $this->isDuplicate($messageId)) {
+            return ['reply' => null, 'paused' => true, 'reason' => 'duplicate_message_id'];
+        }
+
+        if ($this->detectOptOut($text)) {
+            $this->markOptedOut($phone, $text);
+            $this->logIncoming($phone, $text, $messageId);
+            return [
+                'reply'  => 'Pronto, você foi removida da minha lista. Se mudar de ideia, é só me chamar de novo. ☺️',
+                'paused' => true,
+                'reason' => 'opt_out_acknowledged',
+            ];
+        }
 
         if ($this->isPaused($phone)) {
+            $this->logIncoming($phone, $text, $messageId);
             return [
                 'reply'   => null,
                 'paused'  => true,
-                'reason'  => 'ia_paused (escalation prévia)',
+                'reason'  => 'ia_paused (escalation prévia ou conversa com humana)',
             ];
         }
 
         if ($this->isOptedOut($phone)) {
-            return [
-                'reply'   => null,
-                'paused'  => true,
-                'reason'  => 'opt_out',
-            ];
+            return ['reply' => null, 'paused' => true, 'reason' => 'opt_out'];
         }
 
-        $this->logIncoming($phone, $text);
+        if ($this->rateLimiter) {
+            $rl = $this->rateLimiter->check($phone);
+            if (!$rl['allowed']) {
+                $this->logIncoming($phone, $text, $messageId);
+                return [
+                    'reply'  => null,
+                    'paused' => true,
+                    'reason' => "rate_limited ({$rl['count']}/{$rl['limit']} em {$rl['window_seconds']}s)",
+                ];
+            }
+        }
+
+        $this->logIncoming($phone, $text, $messageId);
+
+        if ($messageId) {
+            $this->markProcessed($messageId, $phone);
+        }
 
         $clienteNome = $this->getKnownClientName($phone);
         $systemPrompt = $this->promptBuilder->build() . "\n\n" . $this->promptBuilder->buildContext($phone, $clienteNome);
@@ -119,11 +152,48 @@ class ConversationService
         ]);
     }
 
-    private function logIncoming(string $phone, string $text): void
+    private function logIncoming(string $phone, string $text, ?string $messageId = null): void
     {
         $this->db->prepare(
-            'INSERT INTO conversation_logs (phone, direction, message) VALUES (?, ?, ?)'
-        )->execute([$phone, 'inbound', $text]);
+            'INSERT INTO conversation_logs (phone, direction, message, message_id) VALUES (?, ?, ?, ?)'
+        )->execute([$phone, 'inbound', $text, $messageId]);
+    }
+
+    private function isDuplicate(string $messageId): bool
+    {
+        $stmt = $this->db->prepare('SELECT 1 FROM processed_messages WHERE message_id = ?');
+        $stmt->execute([$messageId]);
+        return (bool) $stmt->fetchColumn();
+    }
+
+    private function markProcessed(string $messageId, string $phone): void
+    {
+        $this->db->prepare(
+            'INSERT IGNORE INTO processed_messages (message_id, phone) VALUES (?, ?)'
+        )->execute([$messageId, $phone]);
+    }
+
+    private function detectOptOut(string $text): bool
+    {
+        $norm = mb_strtolower(trim($text));
+        $patterns = [
+            '/^(parar|sair|cancelar|stop|unsubscribe|cancela)\s*[\.\!]?$/u',
+            '/n[aã]o\s+quero\s+(mais|receber)/u',
+            '/me\s+(tira|remova|retira)\s+(da|dessa)/u',
+        ];
+        foreach ($patterns as $p) {
+            if (preg_match($p, $norm)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private function markOptedOut(string $phone, string $reason): void
+    {
+        $this->db->prepare(
+            'INSERT IGNORE INTO unsubscribed_phones (phone, reason) VALUES (?, ?)'
+        )->execute([$phone, mb_substr($reason, 0, 250)]);
     }
 
     private function logOutgoing(string $phone, string $reply, ?string $action, array $result, int $latencyMs): void

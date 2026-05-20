@@ -47,6 +47,7 @@ try {
             $body = json_decode(file_get_contents('php://input') ?: '{}', true) ?: [];
             $phone = (string) ($body['phone'] ?? '');
             $text  = (string) ($body['text'] ?? '');
+            $msgId = isset($body['message_id']) ? (string) $body['message_id'] : null;
             if ($phone === '' || $text === '') {
                 http_response_code(400);
                 echo json_encode(['error' => 'phone and text required']);
@@ -54,7 +55,7 @@ try {
             }
 
             $svc = AppFactory::conversationService(app_db());
-            $r = $svc->handleIncoming($phone, $text);
+            $r = $svc->handleIncoming($phone, $text, $msgId);
             echo json_encode($r, JSON_UNESCAPED_UNICODE);
             break;
 
