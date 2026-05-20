@@ -3,7 +3,7 @@
     "description": "IA de suporte WhatsApp para AMRO Fardamentos",
     "type": "project",
     "require": {
-        "php": "^8.2",
+        "php": "^8.1",
         "ext-pdo": "*",
         "ext-curl": "*",
         "ext-json": "*",
